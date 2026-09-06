@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Turnero Luna y Armonía</string>
+    <style name="Theme.Turnero" parent="android:Theme.Material.Light.NoActionBar"/>
+</resources>
