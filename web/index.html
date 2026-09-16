@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Pacientes</title>
+  <meta name="description" content="Pacientes, turnos con doctor asignado y confirmación por WhatsApp.">
+  <meta name="theme-color" content="#17120F">
+  <meta name="color-scheme" content="dark">
+
+  <!-- iOS: permite instalarla desde Safari (Compartir > Agregar a pantalla de inicio) en modo app, sin la barra del navegador -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Pacientes">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="manifest" href="manifest.webmanifest">
+
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Public+Sans:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <div class="statusbar-spacer" aria-hidden="true"></div>
+    <div class="appbar" id="appbar"></div>
+    <div id="searchWrap"></div>
+    <div class="body" id="body"></div>
+    <div class="bottom-nav" id="bottomNav"></div>
+  </div>
+
+  <div class="scrim" id="scrim" hidden><div class="dialog" id="dialogInner" role="dialog" aria-modal="true"></div></div>
+  <div class="toast" id="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
