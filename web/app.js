@@ -10,7 +10,8 @@
     chevL:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>',
     chevR:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>',
     search:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
-    trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>'
+    trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>',
+    ajustes:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg>'
   };
   var ESTILO_ESTADO = {
     AGENDADO:   {texto:"Sin confirmar", color:"var(--ambar)", fondo:"var(--ambar-fondo)"},
@@ -60,23 +61,47 @@
     ].join("\r\n");
   }
   /** Comparte (o si no hay Web Share con archivos, descarga) el turno como .ics real. */
+  /** Descarga un archivo generado en el navegador (respaldos, .ics). */
+  function descargarArchivo(nombre, contenido, mime){
+    var blob = new Blob([contenido], {type: mime});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = nombre;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+  }
+
+  /**
+   * El .ics solo se genera cuando se elige explícitamente "agregar al
+   * calendario": en la compu se descargaba solo al crear el turno, que no era
+   * lo que se esperaba. Si el dispositivo tiene compartir nativo, se manda por
+   * ahí (así el archivo va adjunto); si no, se descarga.
+   */
   function compartirTurnoComoIcs(turno, paciente){
     var texto = generarIcs(turno, paciente);
-    var blob = new Blob([texto], {type:"text/calendar"});
     var nombreArchivo = "turno-" + turno.id + ".ics";
     var file = null;
-    try{ file = new File([blob], nombreArchivo, {type:"text/calendar"}); }catch(e){}
+    try{ file = new File([texto], nombreArchivo, {type:"text/calendar"}); }catch(e){}
 
     if(file && navigator.canShare && navigator.canShare({files:[file]})){
       navigator.share({files:[file], title:"Turno"}).catch(function(){});
       return;
     }
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement("a");
-    a.href = url; a.download = nombreArchivo;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
-    toast("Se descargó el turno (.ics) — compartilo por WhatsApp o mail");
+    descargarArchivo(nombreArchivo, texto, "text/calendar");
+    toast("Se descargó el archivo del turno (.ics)");
+  }
+
+  /** Texto del turno, para mandarlo por WhatsApp o por mail. */
+  function textoDelTurno(turno){
+    var i = new Date(turno.inicio);
+    return "Le confirmamos su turno con la Dr. " + turno.doctorNombre +
+      " el día " + ddmm(i) + " a las " + horaCorta(i) + " hs.";
+  }
+  function mailtoTurno(turno, paciente){
+    var asunto = "Turno con Dr. " + turno.doctorNombre + " - " + ddmm(new Date(turno.inicio));
+    return "mailto:" + encodeURIComponent(paciente && paciente.email ? paciente.email : "") +
+      "?subject=" + encodeURIComponent(asunto) +
+      "&body=" + encodeURIComponent(textoDelTurno(turno));
   }
 
   // ---- Datos + persistencia ----
@@ -97,6 +122,35 @@
   function guardar(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(datos)); }catch(e){} }
 
   var datos = cargar();
+
+  function hayDatos(){
+    return datos.pacientes.length > 0 || datos.doctores.length > 0 || datos.turnos.length > 0;
+  }
+
+  // ---- Copia automática diaria, dentro del navegador ----
+  // Protege contra errores propios (borrar algo sin querer), no contra que se
+  // borren los datos del navegador: para eso está el respaldo a archivo.
+  var CLAVE_AUTO = STORAGE_KEY + "-auto";
+
+  function leerCopiaAutomatica(){
+    try{
+      var raw = localStorage.getItem(CLAVE_AUTO);
+      if(!raw) return null;
+      var c = JSON.parse(raw);
+      return (c && c.fecha && c.datos) ? c : null;
+    }catch(e){ return null; }
+  }
+
+  /** Una por día, pisando la anterior. Nunca pisa una copia con datos usando una vacía. */
+  function guardarCopiaAutomaticaSiCorresponde(){
+    if(!hayDatos()) return;
+    var hoy = isoFecha(new Date());
+    var previa = leerCopiaAutomatica();
+    if(previa && previa.fecha === hoy) return;
+    try{
+      localStorage.setItem(CLAVE_AUTO, JSON.stringify({ fecha: hoy, datos: datos }));
+    }catch(e){ /* sin espacio: la copia manual sigue disponible */ }
+  }
 
   // ---- Estado de UI ----
   var ui = {
@@ -127,6 +181,34 @@
     return datos.turnos
       .filter(function(t){ return esMismoDia(new Date(t.inicio), dia); })
       .sort(function(a,b){ return new Date(a.inicio) - new Date(b.inicio); });
+  }
+
+  /**
+   * Devuelve el turno que choca con el horario pedido, o null si está libre.
+   * Choca si se pisan en el tiempo (no hace falta que arranquen a la misma
+   * hora: cuenta la duración) y es el mismo doctor o la misma paciente.
+   * Los cancelados no ocupan el horario — su lugar queda libre.
+   */
+  function turnoEnConflicto(inicio, duracionMin, doctorId, pacienteId, ignorarTurnoId){
+    var desde = inicio.getTime();
+    var hasta = desde + (Number(duracionMin) || 30) * 60000;
+    for(var i=0;i<datos.turnos.length;i++){
+      var t = datos.turnos[i];
+      if(t.id === ignorarTurnoId) continue;
+      if(t.estado === "CANCELADO") continue;
+      var tDesde = new Date(t.inicio).getTime();
+      var tHasta = tDesde + (Number(t.duracion) || 30) * 60000;
+      if(desde < tHasta && hasta > tDesde){
+        if(t.doctorId === doctorId || (pacienteId && t.pacienteId === pacienteId)) return t;
+      }
+    }
+    return null;
+  }
+
+  function motivoConflicto(choque, doctorId){
+    if(choque.doctorId === doctorId) return "Dr. " + choque.doctorNombre + " ya tiene un turno en ese horario";
+    var p = pacientePor(choque.pacienteId);
+    return (p ? p.nombre : "La paciente") + " ya tiene un turno en ese horario";
   }
   // ---- Días hábiles y feriados (Argentina) ----
   /** Domingo de Pascua (algoritmo de Meeus/Butcher) — de ahí salen Carnaval y Viernes Santo. */
@@ -226,8 +308,10 @@
         '</div>';
     } else if(ui.tab === "pacientes"){
       bar.innerHTML = '<h2>Pacientes</h2><button class="icon-btn" data-action="nuevo-paciente">' + ICONS.plus + '</button>';
-    } else {
+    } else if(ui.tab === "doctores"){
       bar.innerHTML = '<h2>Doctores</h2><button class="icon-btn" data-action="nuevo-doctor">' + ICONS.plus + '</button>';
+    } else {
+      bar.innerHTML = '<h2>Ajustes</h2>';
     }
   }
 
@@ -250,7 +334,8 @@
     function item(tab, icon, label){
       return '<button class="nav-item ' + (ui.tab===tab?"on":"") + '" data-action="tab" data-tab="' + tab + '">' + icon + '<span>' + label + '</span></button>';
     }
-    nav.innerHTML = item("agenda", ICONS.calendar, "Agenda") + item("pacientes", ICONS.users, "Pacientes") + item("doctores", ICONS.stethoscope, "Doctores");
+    nav.innerHTML = item("agenda", ICONS.calendar, "Agenda") + item("pacientes", ICONS.users, "Pacientes") +
+      item("doctores", ICONS.stethoscope, "Doctores") + item("ajustes", ICONS.ajustes, "Ajustes");
   }
 
   function escAttr(s){ return (s||"").replace(/"/g,"&quot;"); }
@@ -267,6 +352,7 @@
     if(ui.tab === "agenda") return renderAgenda(body);
     if(ui.tab === "pacientes") return renderPacientes(body);
     if(ui.tab === "doctores") return renderDoctores(body);
+    if(ui.tab === "ajustes") return renderAjustes(body);
   }
 
   // ---- Agenda ----
@@ -397,8 +483,9 @@
     html += '<div class="field"><label>Notas (opcional)</label><textarea id="fNotas">' + escHtml(f.notas) + '</textarea></div>';
 
     html += '<div class="check-card"><input type="checkbox" id="fCompartir" ' + (f.compartirAhora?"checked":"") + '>' +
-      '<div><div class="t">Compartir con la paciente ahora</div><div class="d">Abre el turno como .ics para mandarlo por WhatsApp/mail</div></div></div>';
+      '<div><div class="t">Compartir con la paciente ahora</div><div class="d">Al guardar, abre las opciones para mandárselo por WhatsApp o mail</div></div></div>';
 
+    html += '<div id="conflictoWrap"></div>';
     html += '<button class="btn btn-primary" id="btnGuardarTurno">Guardar turno</button>';
 
     body.innerHTML = html;
@@ -416,9 +503,9 @@
       renderComboResults(); renderTelefonoWrap(); actualizarBotonGuardarTurno();
     });
     $("fDoctor").addEventListener("change", function(e){ f.doctorId = e.target.value; actualizarBotonGuardarTurno(); });
-    $("fFecha").addEventListener("change", function(e){ f.fecha = e.target.value; });
-    $("fHora").addEventListener("change", function(e){ f.hora = e.target.value; });
-    $("fDuracion").addEventListener("input", function(e){ f.duracion = e.target.value; });
+    $("fFecha").addEventListener("input", function(e){ f.fecha = e.target.value; actualizarBotonGuardarTurno(); });
+    $("fHora").addEventListener("input", function(e){ f.hora = e.target.value; actualizarBotonGuardarTurno(); });
+    $("fDuracion").addEventListener("input", function(e){ f.duracion = e.target.value; actualizarBotonGuardarTurno(); });
     $("fNotas").addEventListener("input", function(e){ f.notas = e.target.value; });
     $("fCompartir").addEventListener("change", function(e){ f.compartirAhora = e.target.checked; });
     $("btnGuardarTurno").addEventListener("click", function(){ if(!$("btnGuardarTurno").disabled) abrirDialogoConfirmarTurno(); });
@@ -450,16 +537,37 @@
     $("fTelefono").addEventListener("input", function(e){ f.telefonoNuevoPaciente = e.target.value; actualizarBotonGuardarTurno(); });
   }
 
+  /** Choque de horario del formulario de nuevo turno, o null si está libre. */
+  function conflictoDelFormulario(){
+    var f = ui.formTurno;
+    if(f.doctorId === "" || !f.fecha || !f.hora) return null;
+    var inicio = new Date(f.fecha + "T" + f.hora + ":00");
+    if(isNaN(inicio.getTime())) return null;
+    return turnoEnConflicto(inicio, f.duracion, Number(f.doctorId), f.pacienteId || null, null);
+  }
+
   function actualizarBotonGuardarTurno(){
     var btn = $("btnGuardarTurno");
     if(!btn) return;
     var f = ui.formTurno;
     var pacienteSel = f.pacienteId ? pacientePor(f.pacienteId) : null;
-    btn.disabled = !(f.doctorId !== "" && (pacienteSel || f.nombreNuevoPaciente.trim()));
+    var completo = f.doctorId !== "" && (pacienteSel || f.nombreNuevoPaciente.trim());
+
+    var choque = completo ? conflictoDelFormulario() : null;
+    var wrap = $("conflictoWrap");
+    if(wrap){
+      wrap.innerHTML = choque
+        ? '<p class="aviso-conflicto">' + escHtml(motivoConflicto(choque, Number(f.doctorId))) +
+          ' (' + horaCorta(new Date(choque.inicio)) + ' hs · ' + choque.duracion + ' min). Elegí otro horario.</p>'
+        : "";
+    }
+    btn.disabled = !completo || !!choque;
   }
 
   function abrirDialogoConfirmarTurno(){
     var f = ui.formTurno;
+    var choque = conflictoDelFormulario();
+    if(choque){ abrirDialogoConflicto(choque, Number(f.doctorId)); return; }
     var pacienteSel = f.pacienteId ? pacientePor(f.pacienteId) : null;
     var doctor = doctorPor(Number(f.doctorId));
     var nombreMostrado = pacienteSel ? pacienteSel.nombre : f.nombreNuevoPaciente;
@@ -493,17 +601,14 @@
       };
       datos.turnos.push(turno);
       guardar();
-      var pacienteCreado = pacientePor(pacienteId);
       ui.diaSeleccionado = new Date(fechaObj.getFullYear(), fechaObj.getMonth(), fechaObj.getDate());
       ui.vistaAgenda = "dia";
       ui.formTurno = null;
       cerrarDialogo();
       irA("agenda");
-      if(f.compartirAhora && pacienteCreado){
-        compartirTurnoComoIcs(turno, pacienteCreado);
-      } else {
-        toast("Turno guardado");
-      }
+      toast("Turno guardado");
+      // Nada se descarga solo: si se pidió compartir, se abren las opciones.
+      if(f.compartirAhora) abrirDialogoCompartir(turno.id);
     }
 
     if(f.pacienteId){
@@ -541,10 +646,10 @@
         (turno.estado === "CANCELADO" ? "✓ " : "") + 'Cancelado</button>' +
     '</div>';
 
+    html += '<button class="btn btn-outline" data-action="compartir-turno">Compartir turno</button>';
     if(p){
       html += '<a class="btn btn-outline" href="' + waHref(p.telefono, mensajeConfirmacion(turno, turno.doctorNombre)) + '" target="_blank" rel="noopener" data-action="pedir-confirmacion">Pedir confirmación por WhatsApp</a>';
     }
-    html += '<button class="btn btn-outline" data-action="compartir-ics">Compartir turno (.ics)</button>';
     html += '<button class="btn btn-outline" data-action="reagendar">Reagendar</button>';
     html += '<button class="btn btn-danger-text" data-action="borrar-turno">Borrar turno</button>';
 
@@ -571,12 +676,32 @@
       '<div class="field"><label>Fecha</label><input type="date" id="rFecha" value="' + f.fecha + '"></div>' +
       '<div class="field"><label>Hora</label><input type="time" id="rHora" value="' + f.hora + '"></div>' +
     '</div>';
+    html += '<div id="conflictoWrap"></div>';
     html += '<button class="btn btn-primary" id="btnConfirmarReagendo">Confirmar reagendo</button>';
     body.innerHTML = html;
 
-    $("rFecha").addEventListener("change", function(e){ f.fecha = e.target.value; });
-    $("rHora").addEventListener("change", function(e){ f.hora = e.target.value; });
+    // Mismo control que al crear: no se puede reagendar encima de otro turno.
+    function conflictoDelReagendo(){
+      if(!f.fecha || !f.hora) return null;
+      var nueva = new Date(f.fecha + "T" + f.hora + ":00");
+      if(isNaN(nueva.getTime())) return null;
+      return turnoEnConflicto(nueva, turno.duracion, turno.doctorId, turno.pacienteId, turno.id);
+    }
+    function revisarReagendo(){
+      var choque = conflictoDelReagendo();
+      $("conflictoWrap").innerHTML = choque
+        ? '<p class="aviso-conflicto">' + escHtml(motivoConflicto(choque, turno.doctorId)) +
+          ' (' + horaCorta(new Date(choque.inicio)) + ' hs · ' + choque.duracion + ' min). Elegí otro horario.</p>'
+        : "";
+      $("btnConfirmarReagendo").disabled = !!choque;
+    }
+    revisarReagendo();
+
+    $("rFecha").addEventListener("input", function(e){ f.fecha = e.target.value; revisarReagendo(); });
+    $("rHora").addEventListener("input", function(e){ f.hora = e.target.value; revisarReagendo(); });
     $("btnConfirmarReagendo").addEventListener("click", function(){
+      var choque = conflictoDelReagendo();
+      if(choque){ abrirDialogoConflicto(choque, turno.doctorId); return; }
       var nueva = new Date(f.fecha + "T" + f.hora + ":00");
       turno.inicio = nueva.toISOString();
       turno.estado = "AGENDADO";
@@ -609,6 +734,258 @@
     });
     html += '</div>';
     body.innerHTML = html;
+  }
+
+  // ---- Respaldo de datos ----
+  function celdaCSV(valor){
+    var s = (valor === null || valor === undefined) ? "" : String(valor);
+    return /[",\n;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+  function armarCSV(encabezados, filas){
+    var lineas = [encabezados.map(celdaCSV).join(",")];
+    filas.forEach(function(f){ lineas.push(f.map(celdaCSV).join(",")); });
+    // El BOM hace que Excel abra bien los acentos.
+    return "﻿" + lineas.join("\r\n");
+  }
+  function marcaDeTiempo(){
+    var d = new Date();
+    return d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate()) + "-" + pad(d.getHours()) + pad(d.getMinutes());
+  }
+
+  function exportarJSON(){
+    descargarArchivo("respaldo-pacientes-" + marcaDeTiempo() + ".json",
+      JSON.stringify(datos, null, 2), "application/json");
+    toast("Respaldo descargado");
+  }
+  function exportarTurnosCSV(){
+    var filas = datos.turnos.slice()
+      .sort(function(a,b){ return new Date(a.inicio) - new Date(b.inicio); })
+      .map(function(t){
+        var p = pacientePor(t.pacienteId);
+        var i = new Date(t.inicio);
+        return [
+          isoFecha(i), horaCorta(i), t.duracion,
+          p ? p.nombre : "", p ? p.telefono : "", p && p.email ? p.email : "",
+          t.doctorNombre, ESTILO_ESTADO[t.estado] ? ESTILO_ESTADO[t.estado].texto : t.estado,
+          t.recordatorioEnviado ? "sí" : "no", t.notas || ""
+        ];
+      });
+    descargarArchivo("turnos-" + marcaDeTiempo() + ".csv",
+      armarCSV(["Fecha","Hora","Duración (min)","Paciente","Teléfono","Email","Doctor","Estado","Recordatorio enviado","Notas"], filas),
+      "text/csv");
+    toast("Turnos exportados");
+  }
+  function exportarPacientesCSV(){
+    var filas = datos.pacientes.slice()
+      .sort(function(a,b){ return a.nombre.localeCompare(b.nombre, "es"); })
+      .map(function(p){ return [p.nombre, p.telefono, p.email || "", p.notas || ""]; });
+    descargarArchivo("pacientes-" + marcaDeTiempo() + ".csv",
+      armarCSV(["Nombre","Teléfono","Email","Notas"], filas), "text/csv");
+    toast("Pacientes exportados");
+  }
+
+  /** Pide confirmación y reemplaza todo. Lo usan el archivo y la copia automática. */
+  function restaurarDatos(nuevo, descripcion){
+    if(!nuevo || !Array.isArray(nuevo.pacientes) || !Array.isArray(nuevo.doctores) || !Array.isArray(nuevo.turnos)){
+      toast("El respaldo no es válido");
+      return;
+    }
+    abrirDialogo(
+      '<h3>¿Restaurar ' + escHtml(descripcion) + '?</h3>' +
+      '<p>Contiene ' + nuevo.pacientes.length + ' paciente(s), ' + nuevo.doctores.length +
+      ' doctor(es) y ' + nuevo.turnos.length + ' turno(s).</p>' +
+      '<p>Se reemplaza todo lo que tenés cargado ahora. Si no querés perderlo, descargá antes un respaldo.</p>' +
+      '<div class="dialog-actions"><span></span><div class="actions-right">' +
+        '<button class="dlg-btn dlg-btn-text" data-action="cerrar-dialogo">Cancelar</button>' +
+        '<button class="dlg-btn dlg-btn-primary" id="btnConfirmarRestaurar">Restaurar</button>' +
+      '</div></div>'
+    );
+    $("btnConfirmarRestaurar").addEventListener("click", function(){
+      datos = nuevo;
+      if(!datos.nextIds){
+        var maxId = function(lista){ return lista.reduce(function(m,x){ return Math.max(m, x.id||0); }, 0) + 1; };
+        datos.nextIds = { paciente:maxId(datos.pacientes), doctor:maxId(datos.doctores), turno:maxId(datos.turnos) };
+      }
+      guardar();
+      cerrarDialogo();
+      ui.recordatoriosVistos = [];
+      toast("Respaldo restaurado");
+      irA("agenda");
+    });
+  }
+
+  function restaurarDesdeArchivo(archivo){
+    var lector = new FileReader();
+    lector.onload = function(){
+      var nuevo;
+      try { nuevo = JSON.parse(lector.result); }
+      catch(e){ toast("El archivo no es un respaldo válido"); return; }
+      restaurarDatos(nuevo, "este respaldo");
+    };
+    lector.readAsText(archivo);
+  }
+
+  // ---- Respaldo automático a un archivo del disco ----
+  // Usa la File System Access API: se elige el archivo una sola vez y después
+  // la app lo puede reescribir sola. Chrome y Edge de escritorio la soportan;
+  // Safari (Mac y iPhone) y Firefox no — ahí esta sección no aparece.
+  var CLAVE_ULTIMO_AUTO = STORAGE_KEY + "-ultimo-archivo";
+  function soportaArchivoAutomatico(){ return typeof window.showSaveFilePicker === "function"; }
+
+  /** El handle del archivo no es serializable a JSON, así que va en IndexedDB. */
+  function handleGuardado(accion, valor){
+    return new Promise(function(resolve){
+      var req;
+      try { req = indexedDB.open("pacientes-respaldo", 1); }
+      catch(e){ resolve(null); return; }
+      req.onupgradeneeded = function(){ req.result.createObjectStore("handles"); };
+      req.onerror = function(){ resolve(null); };
+      req.onsuccess = function(){
+        var db = req.result, tx, store, op;
+        try {
+          tx = db.transaction("handles", accion === "get" ? "readonly" : "readwrite");
+          store = tx.objectStore("handles");
+          op = accion === "get" ? store.get("archivo")
+             : accion === "set" ? store.put(valor, "archivo")
+             : store.delete("archivo");
+        } catch(e){ resolve(null); return; }
+        op.onsuccess = function(){ resolve(accion === "get" ? op.result : true); };
+        op.onerror = function(){ resolve(null); };
+        tx.onerror = function(){ resolve(null); };
+      };
+    });
+  }
+
+  function escribirRespaldoEnArchivo(handle){
+    return handle.createWritable().then(function(w){
+      return w.write(JSON.stringify(datos, null, 2)).then(function(){ return w.close(); });
+    }).then(function(){
+      try{ localStorage.setItem(CLAVE_ULTIMO_AUTO, new Date().toISOString()); }catch(e){}
+    });
+  }
+
+  /** Al abrir la app: si el archivo ya está elegido y con permiso, lo reescribe una vez por día. */
+  function respaldoDiarioEnArchivo(){
+    if(!soportaArchivoAutomatico() || !hayDatos()) return;
+    var ultimo = localStorage.getItem(CLAVE_ULTIMO_AUTO);
+    if(ultimo && isoFecha(new Date(ultimo)) === isoFecha(new Date())) return;
+    handleGuardado("get").then(function(handle){
+      if(!handle || !handle.queryPermission) return;
+      // Sin gesto del usuario no se puede pedir permiso: si no está concedido,
+      // queda para cuando entre a Ajustes y toque el botón.
+      return handle.queryPermission({mode:"readwrite"}).then(function(permiso){
+        if(permiso === "granted") return escribirRespaldoEnArchivo(handle);
+      });
+    }).catch(function(){});
+  }
+
+  function elegirArchivoDeRespaldo(){
+    window.showSaveFilePicker({
+      suggestedName: "respaldo-pacientes.json",
+      types: [{ description: "Respaldo", accept: {"application/json": [".json"]} }]
+    }).then(function(handle){
+      return handleGuardado("set", handle).then(function(recordado){
+        return escribirRespaldoEnArchivo(handle).then(function(){
+          // Si el navegador no pudo recordar el archivo, el respaldo de hoy se
+          // escribió igual, pero el automático no va a funcionar: hay que decirlo.
+          toast(recordado ? "Respaldo guardado en " + handle.name
+                          : "Se guardó el respaldo, pero este navegador no puede recordar el archivo: el automático no va a andar");
+          renderBody();
+        });
+      });
+    }).catch(function(){ /* canceló el selector */ });
+  }
+
+  function guardarAhoraEnArchivo(){
+    handleGuardado("get").then(function(handle){
+      if(!handle) return;
+      return handle.requestPermission({mode:"readwrite"}).then(function(permiso){
+        if(permiso !== "granted"){ toast("Hace falta dar permiso al archivo"); return; }
+        return escribirRespaldoEnArchivo(handle).then(function(){
+          toast("Respaldo actualizado");
+          renderBody();
+        });
+      });
+    }).catch(function(){ toast("No se pudo escribir el archivo"); });
+  }
+
+  function cargarDesdeArchivoElegido(){
+    handleGuardado("get").then(function(handle){
+      if(!handle) return;
+      return handle.requestPermission({mode:"read"}).then(function(permiso){
+        if(permiso !== "granted"){ toast("Hace falta dar permiso al archivo"); return; }
+        return handle.getFile().then(function(archivo){ restaurarDesdeArchivo(archivo); });
+      });
+    }).catch(function(){ toast("No se pudo leer el archivo"); });
+  }
+
+  function olvidarArchivoDeRespaldo(){
+    handleGuardado("del").then(function(){
+      try{ localStorage.removeItem(CLAVE_ULTIMO_AUTO); }catch(e){}
+      toast("Se dejó de usar el archivo");
+      renderBody();
+    });
+  }
+
+  function renderAjustes(body){
+    var copia = leerCopiaAutomatica();
+
+    var html =
+      '<p class="seccion-titulo">Respaldo automático</p>' +
+      '<div id="archivoAutoWrap"></div>' +
+      '<p class="seccion-nota">Copia diaria dentro del navegador' +
+        (copia ? ' — última: ' + fechaCorta(new Date(copia.fecha + "T12:00:00")) : ' — todavía no hay ninguna') +
+        '. Sirve si borrás algo sin querer, pero se pierde junto con los datos si se limpia el navegador.</p>' +
+      (copia ? '<button class="btn btn-outline" style="margin-top:0" data-action="restaurar-copia-auto">Restaurar la copia del ' +
+        fechaCorta(new Date(copia.fecha + "T12:00:00")) + '</button>' : '') +
+
+      '<p class="seccion-titulo" style="margin-top:26px;">Respaldo manual</p>' +
+      '<p class="seccion-nota">Los pacientes y turnos se guardan solo en este dispositivo. Guardá un respaldo cada tanto en un lugar seguro.</p>' +
+      '<button class="btn btn-primary" data-action="exportar-json">Descargar respaldo (JSON)</button>' +
+      '<button class="btn btn-outline" data-action="exportar-turnos-csv">Exportar turnos (CSV)</button>' +
+      '<button class="btn btn-outline" data-action="exportar-pacientes-csv">Exportar pacientes (CSV)</button>' +
+      '<p class="seccion-nota" style="margin-top:22px;">El CSV es para abrir en Excel; para restaurar hace falta el JSON, que es el que guarda todo.</p>' +
+      '<label class="btn btn-outline" for="inputRestaurar" style="margin-top:0;">Restaurar desde un respaldo (JSON)</label>' +
+      '<input type="file" id="inputRestaurar" accept="application/json,.json" hidden>';
+
+    body.innerHTML = html;
+
+    $("inputRestaurar").addEventListener("change", function(e){
+      var archivo = e.target.files && e.target.files[0];
+      if(archivo) restaurarDesdeArchivo(archivo);
+      e.target.value = "";
+    });
+
+    renderArchivoAutomatico();
+  }
+
+  /** Sección del archivo automático — depende del navegador y de si ya se eligió uno. */
+  function renderArchivoAutomatico(){
+    var wrap = $("archivoAutoWrap");
+    if(!wrap) return;
+
+    if(!soportaArchivoAutomatico()){
+      wrap.innerHTML = '<p class="seccion-nota">Este navegador no permite que la app escriba sola en un archivo ' +
+        '(lo soportan Chrome y Edge en la computadora; Safari y el iPhone no). Ahí el respaldo va a mano, con el botón de abajo.</p>';
+      return;
+    }
+
+    handleGuardado("get").then(function(handle){
+      if(!handle){
+        wrap.innerHTML =
+          '<p class="seccion-nota">Elegí un archivo una sola vez y la app lo reescribe sola, una vez por día, pisando el anterior.</p>' +
+          '<button class="btn btn-primary" data-action="elegir-archivo-auto">Elegir archivo de respaldo</button>';
+        return;
+      }
+      var ultimo = localStorage.getItem(CLAVE_ULTIMO_AUTO);
+      wrap.innerHTML =
+        '<p class="seccion-nota">Archivo: <b>' + escHtml(handle.name) + '</b>' +
+          (ultimo ? '<br>Último respaldo: ' + fechaCorta(new Date(ultimo)) + ', ' + horaCorta(new Date(ultimo)) + ' hs' : '<br>Todavía sin escribir') +
+        '</p>' +
+        '<button class="btn btn-outline" style="margin-top:0" data-action="cargar-archivo-auto">Cargar datos desde ese archivo</button>' +
+        '<button class="btn btn-outline" data-action="guardar-archivo-auto">Guardar respaldo ahora</button>' +
+        '<button class="btn btn-text" data-action="olvidar-archivo-auto">Dejar de usar este archivo</button>';
+    });
   }
 
   // ---- Doctores ----
@@ -701,6 +1078,43 @@
     );
   }
 
+  function abrirDialogoCompartir(turnoId){
+    var turno = turnoPor(turnoId);
+    if(!turno) return;
+    var p = pacientePor(turno.pacienteId);
+    var i = new Date(turno.inicio);
+
+    var html = '<h3>Compartir turno</h3>' +
+      '<p style="color:var(--ink); font-weight:600;">' + escHtml(p ? p.nombre : "Paciente") + '</p>' +
+      '<p>' + cap(fechaLarga(i)) + ', ' + horaCorta(i) + ' hs · Dr. ' + escHtml(turno.doctorNombre) + '</p>';
+
+    if(p && p.telefono){
+      html += '<a class="btn btn-primary" style="margin-top:14px;" target="_blank" rel="noopener" data-action="cerrar-dialogo" ' +
+        'href="' + waHref(p.telefono, textoDelTurno(turno)) + '">Enviar por WhatsApp</a>';
+    }
+    html += '<a class="btn btn-outline" data-action="cerrar-dialogo" href="' + mailtoTurno(turno, p) + '">' +
+      (p && p.email ? 'Enviar por email' : 'Enviar por email (sin dirección cargada)') + '</a>';
+    html += '<button class="btn btn-text" data-action="descargar-ics" data-id="' + turno.id + '">Archivo para el calendario (.ics)</button>';
+    html += '<button class="btn btn-text" data-action="cerrar-dialogo">Cerrar</button>';
+
+    abrirDialogo(html);
+  }
+
+  function abrirDialogoConflicto(choque, doctorId){
+    var p = pacientePor(choque.pacienteId);
+    var i = new Date(choque.inicio);
+    abrirDialogo(
+      '<h3>Ese horario está ocupado</h3>' +
+      '<p>' + escHtml(motivoConflicto(choque, doctorId)) + ':</p>' +
+      '<p style="color:var(--ink); font-weight:600;">' + escHtml(p ? p.nombre : "Paciente") + '</p>' +
+      '<p>' + cap(fechaLarga(i)) + ', ' + horaCorta(i) + ' hs · ' + choque.duracion + ' min · Dr. ' + escHtml(choque.doctorNombre) + '</p>' +
+      '<p>Elegí otro horario. Si ese turno ya no va, abrilo y marcalo como Cancelado — ahí el horario queda libre.</p>' +
+      '<div class="dialog-actions"><span></span><div class="actions-right">' +
+        '<button class="dlg-btn dlg-btn-primary" data-action="cerrar-dialogo">Entendido</button>' +
+      '</div></div>'
+    );
+  }
+
   function abrirDialogoBorrarTurno(turnoId){
     var turno = turnoPor(turnoId);
     if(!turno) return;
@@ -787,9 +1201,11 @@
       case "pedir-confirmacion": {
         var t3 = turnoPor(ui.pantalla.turnoId); t3.recordatorioEnviado = true; guardar(); toast("Se abrió WhatsApp"); break;
       }
-      case "compartir-ics": {
-        var t6 = turnoPor(ui.pantalla.turnoId);
+      case "compartir-turno": abrirDialogoCompartir(ui.pantalla.turnoId); break;
+      case "descargar-ics": {
+        var t6 = turnoPor(Number(id));
         var p6 = t6 ? pacientePor(t6.pacienteId) : null;
+        cerrarDialogo();
         if(t6 && p6) compartirTurnoComoIcs(t6, p6);
         break;
       }
@@ -809,6 +1225,18 @@
         datos.pacientes = datos.pacientes.filter(function(p){ return p.id !== pid; });
         guardar(); toast("Paciente borrado"); cerrarDialogo(); renderBody(); break;
       }
+      case "exportar-json": exportarJSON(); break;
+      case "elegir-archivo-auto": elegirArchivoDeRespaldo(); break;
+      case "guardar-archivo-auto": guardarAhoraEnArchivo(); break;
+      case "cargar-archivo-auto": cargarDesdeArchivoElegido(); break;
+      case "olvidar-archivo-auto": olvidarArchivoDeRespaldo(); break;
+      case "restaurar-copia-auto": {
+        var copiaAuto = leerCopiaAutomatica();
+        if(copiaAuto) restaurarDatos(copiaAuto.datos, "la copia automática del " + fechaCorta(new Date(copiaAuto.fecha + "T12:00:00")));
+        break;
+      }
+      case "exportar-turnos-csv": exportarTurnosCSV(); break;
+      case "exportar-pacientes-csv": exportarPacientesCSV(); break;
       case "nuevo-doctor": abrirDialogoDoctor(); break;
       case "borrar-doctor": {
         datos.doctores = datos.doctores.filter(function(d){ return d.id !== Number(id); });
@@ -836,6 +1264,8 @@
   $("scrim").addEventListener("click", function(e){ if(e.target === $("scrim")) cerrarDialogo(); });
 
   render();
+  guardarCopiaAutomaticaSiCorresponde();
+  respaldoDiarioEnArchivo();
 
   if("serviceWorker" in navigator){
     window.addEventListener("load", function(){

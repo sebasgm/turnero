@@ -160,6 +160,11 @@ body{
 .field select{appearance:none; background-image:linear-gradient(45deg, transparent 50%, var(--ink-faint) 50%), linear-gradient(135deg, var(--ink-faint) 50%, transparent 50%); background-position:calc(100% - 16px) center, calc(100% - 11px) center; background-size:5px 5px, 5px 5px; background-repeat:no-repeat;}
 .field textarea{resize:vertical; min-height:56px;}
 .hint{font-size:.72rem; color:var(--ink-faint); margin-top:-6px;}
+.aviso-conflicto{
+  font-size:.8rem; line-height:1.45; color:var(--rojo);
+  background:var(--rojo-fondo); border-radius:10px;
+  padding:10px 12px; margin:0 0 10px;
+}
 .combo-results{
   position:absolute; top:100%; left:0; right:0; margin-top:4px; z-index:5;
   background:var(--surface-3); border:1px solid var(--border); border-radius:10px;
@@ -217,6 +222,9 @@ body{
 .btn-row{display:flex; gap:8px;}
 .btn-row .btn{margin-top:0;}
 .estado-line{font-size:.84rem; color:var(--ink-soft); margin:4px 0 0;}
+.seccion-titulo{font-size:.74rem; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-faint); margin:4px 0 6px;}
+.seccion-nota{font-size:.82rem; line-height:1.5; color:var(--ink-soft); margin:0 0 14px;}
+label.btn{cursor:pointer;}
 
 .scrim{
   position:fixed; inset:0; background:rgba(10,7,6,.55);
